@@ -79,8 +79,10 @@ select
 
 
 -- 业务指标：用户月度留存矩阵
+
+
 with orders_id as (
-   select
+   select DISTINCT
     c.customer_unique_id,
     strftime('%Y-%m', order_purchase_timestamp) as 月份,
     CAST(strftime('%Y', o.order_purchase_timestamp) AS INTEGER) * 12 +
@@ -88,12 +90,11 @@ with orders_id as (
     from orders as o
     join customers as c on c.customer_id=o.customer_id
     where order_status='delivered'
-    group by c.customer_unique_id, 月份, 月份序列
+
 ),
 first_buy as(
     select
         customer_unique_id,
-        min(月份) as 首购月份,
         min(月份序列) as 首购序列
     from orders_id
     GROUP BY customer_unique_id
@@ -101,20 +102,84 @@ first_buy as(
 cohort_data as(
     select
         o.customer_unique_id as user_id,
-        f.首购月份,
+printf('%04d-%02d',
+       (f.首购序列 - 1) / 12,
+       (f.首购序列 - 1) % 12 + 1) AS 首购月份,
         o.月份序列 - f.首购序列 AS 月份差额
     from orders_id as o
     join first_buy  as f on f.customer_unique_id=o.customer_unique_id
 )
 SELECT
-    f.首购月份,
+
+    c.首购月份,
     COUNT(DISTINCT case when 月份差额=0 then c.user_id end ) AS 第0月留存,
     COUNT(DISTINCT case when 月份差额=1 then c.user_id end ) AS 第1月留存,
     COUNT(DISTINCT case when 月份差额=2 then c.user_id end ) AS 第2月留存,
     COUNT(DISTINCT case when 月份差额=3 then c.user_id end ) AS 第3月留存
 FROM cohort_data as c
-join first_buy f on f.customer_unique_id=c.user_id
-GROUP BY f.首购月份
-ORDER BY f.首购月份;
+GROUP BY c.首购月份
+ORDER BY c.首购月份;
 
 
+with orders_id as (
+   select DISTINCT
+    c.customer_unique_id,
+    julianday(date (o.order_purchase_timestamp)) AS 时间序列,
+    order_id
+    from orders as o
+    join customers as c on c.customer_id=o.customer_id
+    where order_status='delivered'
+
+),
+user_buy as(
+    select
+        customer_unique_id,
+        max(时间序列) as 最晚购物时间
+    from orders_id
+    GROUP BY customer_unique_id
+),
+rfm as (
+    select
+        o.customer_unique_id,
+        (SELECT MAX(时间序列) FROM orders_id)- f.最晚购物时间 as 最近消费天数,
+        count(DISTINCT o.order_id) as 消费频率,
+        sum(i.price+i.freight_value)/100.0 as 消费金额
+    from orders_id as o
+    join user_buy as f on o.customer_unique_id=f.customer_unique_id
+    join order_items as i on i.order_id=o.order_id
+    group by o.customer_unique_id
+),
+rfm_score as (
+    select
+    customer_unique_id,
+    最近消费天数,
+    消费频率,
+    消费金额,
+    ntile(5) over (order by 最近消费天数 desc ) R分,
+     CASE
+            WHEN 消费频率 = 1 THEN 1
+            WHEN 消费频率 = 2 THEN 3
+            WHEN 消费频率 >= 3 THEN 5
+            ELSE 1
+        END AS F分,
+    ntile(5) over (order by 消费金额 asc ) m分
+    from rfm
+),
+rfm_label as (
+    select
+    *,
+     CASE
+
+            WHEN R分 >= 3 AND F分 >= 3 AND M分 >= 3 THEN '重要价值客户'
+            WHEN R分 < 3  AND F分 >= 3 AND M分 >= 3 THEN '重要保持客户'
+            WHEN R分 >= 3 AND F分 < 3  AND M分 >= 3 THEN '重要发展客户'
+            WHEN R分 < 3  AND F分 < 3  AND M分 >= 3 THEN '重要挽留客户'
+            WHEN R分 >= 3 AND F分 >= 3 AND M分 < 3  THEN '一般价值客户'
+            WHEN R分 < 3  AND F分 >= 3 AND M分 < 3  THEN '一般保持客户'
+            WHEN R分 >= 3 AND F分 < 3  AND M分 < 3  THEN '一般发展客户'
+            WHEN R分 < 3  AND F分 < 3  AND M分 < 3  THEN '一般挽留客户'
+        END AS 客户类型
+    from rfm_score
+)
+
+SELECT * FROM rfm_label ;
