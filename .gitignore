@@ -4,4 +4,4 @@ __pycache__/
 .idea/
 *.db
 data/
-
+*.xlsx
