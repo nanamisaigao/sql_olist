@@ -69,7 +69,8 @@ data/*.csv ──▶ import_data.py ──▶ olist.db（6 张表 + 主外键）
 ```sql
 select (sum(i.price) + sum(i.freight_value)) / 100.0            as GMV,
        sum(i.freight_value) / 100.0                             as 运费,
-       count(distinct o.order_id)                               as 订单数
+       count(distinct o.order_id)                               as 真实订单数
+       (sum(i.price)+sum(i.freight_value))/COUNT(DISTINCT o.order_id)/100.0 as 客单价 
 from orders o
 join order_items i on i.order_id = o.order_id
 where o.order_status = 'delivered';
