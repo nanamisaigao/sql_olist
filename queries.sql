@@ -1,13 +1,23 @@
 -- 业务指标：全平台已完成订单的 GMV、运费总额与真实客单价
 select
     (sum(i.price)+sum(i.freight_value))/100.0 as 已完成商品总额（GMV）,
+    sum(p.payment_value)/100.0 as 已支付商品总额,
+    round(sum(p.payment_value)*1.0/(sum(i.price)+sum(i.freight_value)),2) as 对账率,
     sum(i.freight_value)/100.0 as 运费,
     COUNT(DISTINCT o.order_id) as 真实订单数,
     (sum(i.price)+sum(i.freight_value))/COUNT(DISTINCT o.order_id)/100.0 as 客单价
     from orders as o
     join order_items as i on o.order_id=i.order_id
+    join payments as p on o.order_id = p.order_id
     where o.order_status='delivered';
 
+select
+
+    sum(p.payment_value)/100.0 as 已支付商品总额
+    FROM payments as p
+    join orders o on o.order_id = p.order_id
+    where o.order_status='delivered'
+    ;
 
 -- 业务指标：用户月度留存矩阵
 
