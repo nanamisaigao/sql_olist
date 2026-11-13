@@ -1,9 +1,17 @@
 import sqlite3
+from logging import exception
+
 import pandas as pd
 
 def create_tables(conn):
     cursor = conn.cursor()
-
+    #删除已有表
+    cursor.execute("DROP TABLE IF EXISTS order_items;")
+    cursor.execute("DROP TABLE IF EXISTS payments;")
+    cursor.execute("DROP TABLE IF EXISTS orders;")
+    cursor.execute("DROP TABLE IF EXISTS products;")
+    cursor.execute("DROP TABLE IF EXISTS sellers;")
+    cursor.execute("DROP TABLE IF EXISTS customers;")
     # 1. 客户表
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS customers(
@@ -90,7 +98,6 @@ def create_tables(conn):
 
 def import_data(conn):
 
-    print("开始导入数据。。。")
 
     df_customers = pd.read_csv("data/olist_customers_dataset.csv")
     df_customers.to_sql("customers", con=conn, if_exists='append', index=False)
@@ -122,6 +129,18 @@ def import_data(conn):
 
 if __name__ == "__main__":
     conn = sqlite3.connect("olist.db")
-    create_tables(conn)
-    import_data(conn)
-    conn.close()
+    conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        print("开始重建表结构...")
+        create_tables(conn)
+
+        print("开始导入数据...")
+        import_data(conn)
+
+        conn.commit()
+        print("✅ 所有任务执行成功！")
+    except exception as e:
+        conn.rollback()
+        print(f"发生错误，已回滚！错误信息：{e}")
+    finally:
+        conn.close()
