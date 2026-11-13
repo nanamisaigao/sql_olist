@@ -1,4 +1,6 @@
+
 -- 业务指标：全平台已完成订单的 GMV、运费总额与真实客单价
+
 select
     (sum(i.price)+sum(i.freight_value))/100.0 as 已完成商品总额（GMV）,
     sum(i.freight_value)/100.0 as 运费,
@@ -8,6 +10,7 @@ select
     join order_items as i on o.order_id=i.order_id
     where o.order_status='delivered';
 
+-- [gmv]
 WITH item_summary AS (
     SELECT
         order_id,
@@ -33,7 +36,7 @@ JOIN payment_summary p ON o.order_id = p.order_id
 WHERE o.order_status = 'delivered';
 
 -- 业务指标：用户月度留存矩阵
-
+-- [cd]
 with orders_id as (
    select DISTINCT
     c.customer_unique_id,
@@ -74,6 +77,7 @@ GROUP BY c.首购月份
 ORDER BY c.首购月份;
 
 --用户留存率计算
+-- [urr]
 with orders_id as (
    select DISTINCT
     c.customer_unique_id,
@@ -113,6 +117,7 @@ ORDER BY c.首购月份;
 
 
 -- RFM 模型（用户价值分层）
+-- [rfm]
 with orders_id as (
    select DISTINCT
     c.customer_unique_id,
