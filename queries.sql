@@ -1,23 +1,36 @@
 -- 业务指标：全平台已完成订单的 GMV、运费总额与真实客单价
 select
     (sum(i.price)+sum(i.freight_value))/100.0 as 已完成商品总额（GMV）,
-    sum(p.payment_value)/100.0 as 已支付商品总额,
-    round(sum(p.payment_value)*1.0/(sum(i.price)+sum(i.freight_value)),2) as 对账率,
     sum(i.freight_value)/100.0 as 运费,
     COUNT(DISTINCT o.order_id) as 真实订单数,
     (sum(i.price)+sum(i.freight_value))/COUNT(DISTINCT o.order_id)/100.0 as 客单价
     from orders as o
     join order_items as i on o.order_id=i.order_id
-    join payments as p on o.order_id = p.order_id
     where o.order_status='delivered';
 
-select
-
-    sum(p.payment_value)/100.0 as 已支付商品总额
-    FROM payments as p
-    join orders o on o.order_id = p.order_id
-    where o.order_status='delivered'
-    ;
+WITH item_summary AS (
+    SELECT
+        order_id,
+        SUM(price + freight_value) AS total_item_value
+    FROM order_items
+    GROUP BY order_id
+),
+payment_summary AS (
+    SELECT
+        order_id,
+        SUM(payment_value) AS total_payment_value
+    FROM payments
+    GROUP BY order_id
+)
+SELECT
+    COUNT(DISTINCT o.order_id) as 真实订单数,
+    SUM(i.total_item_value) / 100.0 AS 已完成商品总额_GMV,
+    SUM(p.total_payment_value) / 100.0 AS 已支付商品总额,
+    ROUND(SUM(i.total_item_value) * 100.0/SUM(p.total_payment_value) , 2) AS 对账率百分比
+FROM orders o
+JOIN item_summary i ON o.order_id = i.order_id
+JOIN payment_summary p ON o.order_id = p.order_id
+WHERE o.order_status = 'delivered';
 
 -- 业务指标：用户月度留存矩阵
 
@@ -60,15 +73,42 @@ FROM cohort_data as c
 GROUP BY c.首购月份
 ORDER BY c.首购月份;
 
---留存率计算
--- SELECT
---     c.首购月份,
---     round(COUNT(DISTINCT case when 月份差额=1 then c.user_id end )*1.0/count(DISTINCT c.user_id)*100.0,2) as 次月留存率
---
--- FROM cohort_data as c
--- where 首购月份!= '2016-12'
--- GROUP BY c.首购月份
--- ORDER BY c.首购月份;
+--用户留存率计算
+with orders_id as (
+   select DISTINCT
+    c.customer_unique_id,
+    strftime('%Y-%m', order_purchase_timestamp) as 月份,
+    CAST(strftime('%Y', o.order_purchase_timestamp) AS INTEGER) * 12 +
+        CAST(strftime('%m', o.order_purchase_timestamp) AS INTEGER) AS 月份序列
+    from orders as o
+    join customers as c on c.customer_id=o.customer_id
+    where order_status='delivered'
+
+),
+first_buy as(
+    select
+        customer_unique_id,
+        min(月份序列) as 首购序列
+    from orders_id
+    GROUP BY customer_unique_id
+    ),
+cohort_data as(
+    select
+        o.customer_unique_id as user_id,
+printf('%04d-%02d',
+       (f.首购序列 - 1) / 12,
+       (f.首购序列 - 1) % 12 + 1) AS 首购月份,
+        o.月份序列 - f.首购序列 AS 月份差额
+    from orders_id as o
+    join first_buy  as f on f.customer_unique_id=o.customer_unique_id
+)
+SELECT
+    c.首购月份,
+    round(COUNT(DISTINCT case when 月份差额=1 then c.user_id end )*1.0/count(DISTINCT c.user_id)*100.0,2) as 次月留存率
+FROM cohort_data as c
+where 首购月份!= '2016-12'
+GROUP BY c.首购月份
+ORDER BY c.首购月份;
 
 
 

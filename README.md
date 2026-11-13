@@ -10,7 +10,7 @@
 
 | 指标 | 结果 | 说明 |
 |---|---|---|
-| GMV（已妥投） | **1,584 万 BRL** | 商品金额 + 运费；与支付表对账差异 1.2% |
+| GMV（已妥投） | **1,541 万 BRL** | 商品金额 + 运费；与支付表对账差异 99.98% |
 | 单笔订单均价 | **159.8 BRL** | 按含商品明细的已妥投订单计算 |
 | 客户数 | **93,358** | 按 `customer_unique_id` 去重（`customer_id` 是订单级 ID） |
 | 复购率 | **3.0%** | 仅 2,801 人购买 ≥ 2 次 |
@@ -67,16 +67,32 @@ data/*.csv ──▶ import_data.py ──▶ olist.db（6 张表 + 主外键）
 口径定义：`sum(price) + sum(freight_value)`，仅 `order_status = 'delivered'`，金额从分换算为 BRL。
 
 ```sql
-select (sum(i.price) + sum(i.freight_value)) / 100.0            as GMV,
-       sum(i.freight_value) / 100.0                             as 运费,
-       count(distinct o.order_id)                               as 真实订单数
-       (sum(i.price)+sum(i.freight_value))/COUNT(DISTINCT o.order_id)/100.0 as 客单价 
-from orders o
-join order_items i on i.order_id = o.order_id
-where o.order_status = 'delivered';
+WITH item_summary AS (
+    SELECT
+        order_id,
+        SUM(price + freight_value) AS total_item_value
+    FROM order_items
+    GROUP BY order_id
+),
+payment_summary AS (
+    SELECT
+        order_id,
+        SUM(payment_value) AS total_payment_value
+    FROM payments
+    GROUP BY order_id
+)
+SELECT
+    COUNT(DISTINCT o.order_id) as 真实订单数,
+    SUM(i.total_item_value) / 100.0 AS 已完成商品总额_GMV,
+    SUM(p.total_payment_value) / 100.0 AS 已支付商品总额,
+    ROUND(SUM(i.total_item_value) * 100.0/SUM(p.total_payment_value) , 2) AS 对账率百分比
+FROM orders o
+JOIN item_summary i ON o.order_id = i.order_id
+JOIN payment_summary p ON o.order_id = p.order_id
+WHERE o.order_status = 'delivered';
 ```
 
-**对账**：按 `order_id` 聚合后，商品明细合计 15,843,409.78 BRL，支付流水合计 15,422,461.77 BRL,对账率1.2%，说明近期免邮策略或分期手续费补贴正常。差额（约 42 万）主要源于未支付运费、分期手续费及退款。
+**对账**：按 `order_id` 聚合后，商品明细合计 15419773.75 BRL，支付流水合计 15422461.77 BRL,对账率99.8%，说明数据链路非常健康。
 
 > 注意：`sum(price)` 直接 join 会因一单多明细而行放大，金额列不受影响，但 `count(order_id)` 必须用 `count(distinct)`。
 
