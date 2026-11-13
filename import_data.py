@@ -1,5 +1,10 @@
 import sqlite3
 from logging import exception
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "olist.db"
+DATA_DIR = BASE_DIR / "data"
 
 import pandas as pd
 
@@ -99,36 +104,36 @@ def create_tables(conn):
 def import_data(conn):
 
 
-    df_customers = pd.read_csv("data/olist_customers_dataset.csv")
+    df_customers = pd.read_csv(DATA_DIR/"olist_customers_dataset.csv")
     df_customers.to_sql("customers", con=conn, if_exists='append', index=False)
     print("customers 导入完成")
     # 2. 卖家表 (无外键)
-    df_sellers = pd.read_csv("data/olist_sellers_dataset.csv")
+    df_sellers = pd.read_csv(DATA_DIR/"olist_sellers_dataset.csv")
     df_sellers.to_sql("sellers", conn, if_exists="append", index=False)
 
     # 3. 商品表 (无外键)
-    df_products = pd.read_csv("data/olist_products_dataset.csv")
+    df_products = pd.read_csv(DATA_DIR/"olist_products_dataset.csv")
     df_products.to_sql("products", conn, if_exists="append", index=False)
 
     # 4. 订单主表
-    df_orders = pd.read_csv("data/olist_orders_dataset.csv")
+    df_orders = pd.read_csv(DATA_DIR/"olist_orders_dataset.csv")
     df_orders.to_sql("orders", conn, if_exists="append", index=False)
 
     # 5. 订单明细表
-    df_items=pd.read_csv("data/olist_order_items_dataset.csv")
+    df_items=pd.read_csv(DATA_DIR/"olist_order_items_dataset.csv")
     df_items["price"]=(df_items["price"]*100).round().astype("Int64")
     df_items["freight_value"]=(df_items["freight_value"]*100).round().astype("Int64")
     df_items.to_sql("order_items", conn, if_exists="append", index=False)
 
     # 6. 支付表
-    df_payments = pd.read_csv("data/olist_order_payments_dataset.csv")
+    df_payments = pd.read_csv(DATA_DIR/"olist_order_payments_dataset.csv")
     df_payments["payment_value"] = (df_payments["payment_value"] * 100).round().astype("Int64")
     df_payments.to_sql("payments", conn, if_exists="append", index=False)
     print("✅ 所有数据导入完成！")
 
 
 if __name__ == "__main__":
-    conn = sqlite3.connect("olist.db")
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
         print("开始重建表结构...")
