@@ -44,7 +44,7 @@ def get_retention_rate(conn):
     return df_retention_rate
 
 def get_rfm_report(conn):
-    sql = load_sql("rfm")
+    sql = load_sql("rfm_summary")
     df_rfm_report = pd.read_sql(sql, conn)
     return df_rfm_report
 
