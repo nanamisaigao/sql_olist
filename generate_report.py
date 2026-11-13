@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 import sqlite3
+from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "olist.db"
@@ -10,6 +12,34 @@ def save_excel(df_data,filename):
     with pd.ExcelWriter(filename,engine='openpyxl') as writer:
         for sheet_name,df in df_data.items():
             df.to_excel(writer,sheet_name=sheet_name,index=False)
+            # excel美化
+            worksheet = writer.sheets[sheet_name]
+            worksheet.freeze_panes = "A2"
+            # 2. 设置表头样式（深蓝底、白字、加粗、居中）
+            header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True)
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            # 3. 自动调整列宽 + 数据居中
+            for col in worksheet.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+
+                    if cell.row > 1:
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    try:
+                        if cell.value:
+                            val_str = str(cell.value)
+                            length = sum(2 if ord(c) > 127 else 1 for c in val_str)
+                            if length > max_length:
+                                max_length = length
+                    except:
+                        pass
+                adjusted_width = min(max_length + 4, 50)
+                worksheet.column_dimensions[col_letter].width = adjusted_width
     print(f"报表已成功保存至 {filename}")
 
 
