@@ -57,9 +57,7 @@ first_buy AS(
 cohort_data AS(
     SELECT
         o.customer_unique_id AS user_id,
-printf('%04d-%02d',
-       (f.首购序列 - 1) / 12,
-       (f.首购序列 - 1) % 12 + 1) AS 首购月份,
+        printf('%04d-%02d',(f.首购序列 - 1) / 12,(f.首购序列 - 1) % 12 + 1) AS 首购月份,
         o.月份序列 - f.首购序列 AS 月份差额
     FROM orders_id AS o
     JOIN first_buy  AS f ON f.customer_unique_id=o.customer_unique_id
@@ -78,7 +76,7 @@ ORDER BY c.首购月份;
 --用户留存率计算
 -- [urr]
 WITH orders_id AS (
-   SELECT DISTINCT
+   SELECT
     c.customer_unique_id,
     strftime('%Y-%m', order_purchase_timestamp) AS 月份,
     CAST(strftime('%Y', o.order_purchase_timestamp) AS INTEGER) * 12 +
@@ -98,9 +96,7 @@ first_buy AS(
 cohort_data AS(
     SELECT
         o.customer_unique_id AS user_id,
-printf('%04d-%02d',
-       (f.首购序列 - 1) / 12,
-       (f.首购序列 - 1) % 12 + 1) AS 首购月份,
+        printf('%04d-%02d',(f.首购序列 - 1) / 12,(f.首购序列 - 1) % 12 + 1) AS 首购月份,
         o.月份序列 - f.首购序列 AS 月份差额
     FROM orders_id AS o
     JOIN first_buy  AS f ON f.customer_unique_id=o.customer_unique_id
@@ -253,3 +249,4 @@ SELECT
     FROM rfm_label
     GROUP BY 客户类型
     ;
+
